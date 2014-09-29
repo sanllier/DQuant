@@ -73,9 +73,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="src\DQMachine.cpp" />
     <ClCompile Include="src\DQMOperator.cpp" />
     <ClCompile Include="src\DQMStateReg.cpp" />

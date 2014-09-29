@@ -51,7 +51,7 @@ private:
 	int m_nodesNum;	  //total number of processes
 	int m_qnum;		  //total number of simulating qubits
 	long long m_fullRegSize;	//total state vector size (global vector)
-	long long m_myPartSize;     //size of state vector local part
+	int m_myPartSize;     //size of state vector local part
 	QMComplex* m_qRegister;	    //local part of state vector
 };
 

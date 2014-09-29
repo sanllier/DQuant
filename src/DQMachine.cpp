@@ -126,10 +126,11 @@ DQMStateReg* DQMachine::getCurReg( void ) const
 
 //--------------------------------------------------------------------
 
-inline void sendElement( QMComplex& elem, long long locIdx, int opR, int opC, int target )
+//NOTE: this function is fucking non-safe: total type-slicing
+inline void sendElement( QMComplex& elem, long long locIdx, long long opR, long long opC, long long target )
 {
-    SendData sendingElement = { elem, locIdx, opR, opC };
-	shmem_send( &sendingElement, EXCHNGHDLR, sizeof( sendingElement ), target );
+    SendData sendingElement = { elem, locIdx, (int)opR, (int)opC };
+	shmem_send( &sendingElement, EXCHNGHDLR, sizeof( sendingElement ), (int)target );
 }
 
 void DQMachine::oneQubitEvolution( OneQubitOp& op, int target )
@@ -141,7 +142,7 @@ void DQMachine::oneQubitEvolution( OneQubitOp& op, int target )
 	const bool isUnlocal = ( ( workReg->m_qnum - 1 ) - target ) >= qubitsNumPerProc;
 	const long long rangeStart = workReg->m_myPartSize * workReg->m_myID;
 	const int flipBit = ( workReg->m_qnum - 1 ) - target;
-	unsigned long long arrayPos = 0;
+	int arrayPos = 0;
 	const int targetBits[1] = { flipBit };
 	BitIndex< unsigned long long > locIdx, oppositeIdx;
 
@@ -153,7 +154,7 @@ void DQMachine::oneQubitEvolution( OneQubitOp& op, int target )
 		oppositeIdx = locIdx;
 		oppositeIdx.flipBitAtPos( flipBit );
 
-		arrayPos = locIdx.select( targetBits, 1 );
+		arrayPos = (int)locIdx.select( targetBits, 1 );
 
 		if ( isUnlocal )
         {
@@ -185,7 +186,7 @@ void DQMachine::twoQubitEvolution( TwoQubitOp& op, int targetA, int targetB )
 	const long long rangeStart = workReg->m_myPartSize * workReg->m_myID;
 	const int flipBitA  = ( workReg->m_qnum - 1 ) - targetA;
 	const int flipBitB  = ( workReg->m_qnum - 1 ) - targetB;
-	unsigned long long arrayPos = 0;
+	int arrayPos = 0;
 	const int targetBits[2] = { flipBitA, flipBitB };
 	BitIndex< unsigned long long > locIdx, oppositeIdxA, oppositeIdxB, oppositeIdxAB;
 
@@ -201,7 +202,7 @@ void DQMachine::twoQubitEvolution( TwoQubitOp& op, int targetA, int targetB )
 		oppositeIdxAB = oppositeIdxA;
 		oppositeIdxAB.flipBitAtPos (flipBitB );
 
-		arrayPos = locIdx.select( targetBits, 2 );
+		arrayPos = (int)locIdx.select( targetBits, 2 );
 
 		if ( isAUnlocal && isBUnlocal ) 
         {	

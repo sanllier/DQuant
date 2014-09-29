@@ -101,7 +101,7 @@ void grover( DQMachine& qMachine, void (*oracle)(DQMStateReg* reg), double nF )
 
 	nHadamardTransform( qMachine, nF );
 
-	const int stepsNum = ceil( M_PI * sqrt( double( 1LL << ( qMachine.getCurReg()->getQubitsNum() / 2 ) ) ) / 4.0 );
+	const int stepsNum = (int)ceil( M_PI * sqrt( double( 1LL << ( qMachine.getCurReg()->getQubitsNum() / 2 ) ) ) / 4.0 );
 
 	//QOUT("-- total GA iterations: " << stepsNum  << "\r\n");
 

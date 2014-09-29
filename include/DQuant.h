@@ -67,7 +67,7 @@ public:
     inline static void dquantFinalize( void )    { shmem_finalize(); m_isInitialized = false; } 
     inline static bool dquantInitialized( void ) { return m_isInitialized; } 
     inline static bool dquantFinilized( void )   { return !m_isInitialized; }
-    inline static void dsrand( unsigned long long seed ) { srand( seed ^ ( shmem_my_pe() + 1 ) ); }
+    inline static void dsrand( int seed ) { srand( seed ^ ( shmem_my_pe() + 1 ) ); }
     inline static void synchronise( void ) { shmem_barrier_all(); }
     inline static bool amIMaster( void )   { static bool buf = ( my_pe() == MASTERID ); return buf; }
     inline static double time( void ) { return shmem_time(); }

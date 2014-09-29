@@ -33,7 +33,7 @@ DQMStateReg::DQMStateReg( int qnum )
 			             __FUNCTION__ );
 #endif
 	
-	m_myPartSize = m_fullRegSize / m_nodesNum;
+	m_myPartSize = (int)( m_fullRegSize / m_nodesNum );
 	m_qRegister = new QMComplex[ m_myPartSize ];
 	QOUT( "-- successfully\r\n" );
 }
