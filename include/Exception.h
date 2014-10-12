@@ -37,10 +37,10 @@ public:
 	DislibInactive( const std::string& excLoc );
 };
 
-class QRegisterOverflow: public Exception
+class QRegisterOutOfBounds: public Exception
 {
 public:
-	QRegisterOverflow( const std::string& excLoc, size_t max, size_t cur );
+	QRegisterOutOfBounds( const std::string& excLoc, size_t min, size_t max, size_t cur );
 };
 
 class BitIndexOverflow: public Exception

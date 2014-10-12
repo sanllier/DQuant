@@ -7,7 +7,7 @@ namespace DQuant{
 
 void Exception::print( std::ostream& oStr ) const
 {
-	oStr << "ERROR WAS OCCURED: " << m_what << " " << m_where << "\r\n";
+	oStr << "ERROR WAS OCCURED: " << m_what << " " << m_where << ".\r\n";
 }
 
 std::ostream& operator<<( std::ostream& oStr, const Exception& exc )
@@ -26,11 +26,12 @@ DislibInactive::DislibInactive( const std::string& excLoc )
 
 //------------------------------------------------------------
 
-QRegisterOverflow::QRegisterOverflow( const std::string& excLoc, size_t max, size_t cur )
+QRegisterOutOfBounds::QRegisterOutOfBounds( const std::string& excLoc, size_t min, size_t max, size_t cur )
 {
 	m_what = "Trying to access " + std::to_string(( unsigned long long )(cur)) +  \
-		     " element, but " + std::to_string((unsigned long long)(max - 1)) + \
-		     " is maximum avail.";
+		     " element, but [" + std::to_string(( unsigned long long )(min)) + \
+             ", " + std::to_string(( unsigned long long )(max)) + \
+		     "] is available.";
 	m_where = excLoc;
 }
 

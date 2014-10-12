@@ -6,7 +6,7 @@
 
 //CRAP
 #ifndef M_PI
-    #define M_PI 3.14
+    #define M_PI 3.1415926535;
 #endif
 
 //--------------------------------------------------------------------
@@ -125,6 +125,53 @@ void grover( DQMachine& qMachine, void (*oracle)(DQMStateReg* reg), double nF )
 #ifdef TIMER
 	//QOUT("-- TOTAL GROVER TIME: " << DQuant::time() - startTimeTotal << "\r\n");
 #endif
+}
+
+//--------------------------------------------------------------------
+
+inline void makePsiAdd( DQMStateReg& state )
+{
+    const int shift = state.getLocalRegLen() % 2;
+    for ( long long i = 0; i < state.getLocalRegLen(); ++i )
+        state.fastAccess(i) = i % 2 + shift;
+}
+
+DQMStateReg* shoreCode( DQMachine& qMachine, int q, double nF )
+{
+    const int qNum = qMachine.getCurReg()->getQubitsNum();
+    if ( q < 0 || q >= qNum * qNum )
+        throw QRegisterOutOfBounds( __FUNCTION__, 0, qNum * qNum, q );
+
+    DQMStateReg psiAdd(8);
+    makePsiAdd( psiAdd );
+    DQMStateReg* resState = new DQMStateReg( qMachine.getCurReg()->getQubitsNum() * psiAdd.getFullRegLen() );
+
+    if ( qMachine.getCurReg()->getQubitsNum() == 1 )
+        qMachine.getCurReg()->kron( psiAdd, resState );
+    //else  //WTF
+        //qMachine.getCurReg()->kron(  );
+
+	TwoQubitOp CNOTop(CNOT);
+    OneQubitOp HOp(HADAMARD);
+
+	if ( nF != 0.0 )
+    {
+		CNOTop.addNoise(nF);
+	}
+
+	qMachine.twoQubitEvolution( CNOTop, q, qNum + 3 );
+    qMachine.twoQubitEvolution( CNOTop, q, qNum + 6 );
+    qMachine.oneQubitEvolution( HOp, q );
+    qMachine.oneQubitEvolution( HOp, q + 3 );
+    qMachine.oneQubitEvolution( HOp, q + 6 );
+    qMachine.twoQubitEvolution( CNOTop, q, qNum + 1 );
+    qMachine.twoQubitEvolution( CNOTop, q, qNum + 2 );	
+    qMachine.twoQubitEvolution( CNOTop, q + 3, qNum + 4 );
+    qMachine.twoQubitEvolution( CNOTop, q + 3, qNum + 5 );	
+    qMachine.twoQubitEvolution( CNOTop, q + 6, qNum + 7 );
+    qMachine.twoQubitEvolution( CNOTop, q + 6, qNum + 8 );
+
+    return resState;
 }
 
 //--------------------------------------------------------------------

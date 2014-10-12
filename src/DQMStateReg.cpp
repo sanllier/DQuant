@@ -8,6 +8,12 @@
 #include <iostream>
 
 namespace DQuant {
+
+enum
+{
+    KRONSTEPHDLR = 6
+};
+
 //--------------------------------------------------------------------
 
 DQMStateReg::DQMStateReg( int qnum )
@@ -35,7 +41,7 @@ DQMStateReg::DQMStateReg( int qnum )
 	
 	m_myPartSize = (int)( m_fullRegSize / m_nodesNum );
 	m_qRegister = new QMComplex[ m_myPartSize ];
-	QOUT( "-- successfully\r\n" );
+	QOUT( "-- successfully\r\n" ); 
 }
 
 DQMStateReg::~DQMStateReg()
@@ -79,6 +85,63 @@ double DQMStateReg::copmFidelity( const DQMStateReg& scndPart ) const
 
 	double temp = abs( QMComplex( tempRe, tempIm ) );
 	return temp * temp;
+}
+
+//--------------------------------------------------------------------
+
+static DQMStateReg* kronWorkReg = 0;
+static QMComplex* kronRecvPart = 0;
+static QMComplex* kronResult = 0;
+int kronIterWorkPartShift = 0;
+int kronIterResultPartShift = 0;
+
+void kronStepHdlr( int from, void* data, int size )
+{
+#ifndef PERFORMANCE
+    if ( !kronResult || !kronRecvPart || !kronWorkReg )
+        throw Exception( "NULL static variable." , __FUNCTION__ );
+#endif
+
+	QMComplex* recvData = ( QMComplex* )(data);
+    const long long recvElementsNum = size / sizeof( *recvData );
+    const QMComplex* workPart = kronWorkReg->getReg();
+    const long long workRegLen = kronWorkReg->getLocalRegLen();
+
+    for ( long long i = 0; i < recvElementsNum; ++i )
+    {
+        kronResult[ kronIterResultPartShift++ ] = workPart[ kronIterWorkPartShift++ ] * recvData[i];
+        if ( kronIterWorkPartShift >= workRegLen )
+            kronIterWorkPartShift = 0;
+    }
+    kronRecvPart = 0;
+}
+
+void DQMStateReg::kron( DQMStateReg& mulState, DQMStateReg* outputState )
+{
+    if ( outputState == 0 )
+        throw Exception( "NULL pointer is invalid" , __FUNCTION__ );
+
+    shmem_register_handler( kronStepHdlr, KRONSTEPHDLR );
+
+    outputState->m_qnum = m_qnum * mulState.m_fullRegSize;
+    outputState->m_fullRegSize = m_fullRegSize * mulState.m_fullRegSize;
+    outputState->m_myPartSize = m_myPartSize * mulState.m_fullRegSize;
+    
+    kronWorkReg = this;
+    kronResult = new QMComplex[ outputState->m_myPartSize ];
+    kronIterWorkPartShift = 0;
+    kronIterResultPartShift = 0;
+
+    for ( int i = 0; i < m_nodesNum; ++i )
+    {
+        if ( i == m_myID )
+            for ( int q = 0; q < m_nodesNum; ++q )
+                shmem_send( mulState.getReg(), KRONSTEPHDLR, sizeof( *( mulState.getReg() ) ) * mulState.getLocalRegLen(), i );
+
+        DQuant::synchronise();
+    }
+
+    outputState->m_qRegister = kronResult;
 }
 
 //--------------------------------------------------------------------

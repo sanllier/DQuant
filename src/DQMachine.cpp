@@ -30,8 +30,7 @@ static DQMOperator* workOp  = 0;
 
 //------------------------------HANDLERS------------------------------
 
-void
-exchngElemHdlr( int from, void* data, int size )
+void exchngElemHdlr( int from, void* data, int size )
 {
 	SendData* recvData = ( SendData * )(data);
 	buf->m_qRegister[ recvData->idx ] += (*workOp)[ recvData->opRow ][ recvData->opCol ] * recvData->data;
