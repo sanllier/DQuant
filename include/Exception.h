@@ -6,7 +6,7 @@
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 class Exception
@@ -31,10 +31,10 @@ protected:
 
 //--------------------------------------------------------------------
 
-class DislibInactive: public Exception
+class MPIException: public Exception
 {
 public:
-	DislibInactive( const std::string& excLoc );
+    MPIException( const std::string& excText, const std::string& excLoc );
 };
 
 class QRegisterOutOfBounds: public Exception

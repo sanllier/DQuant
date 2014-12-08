@@ -3,7 +3,7 @@
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 TwoQubitOp::TwoQubitOp( PresetTwoQubitOpType type ):DQMOperator( TWOQUBIT )
@@ -29,40 +29,40 @@ TwoQubitOp::TwoQubitOp( PresetTwoQubitOpType type ):DQMOperator( TWOQUBIT )
 	}
 }
 
-void TwoQubitOp::setCNot( void )
+void TwoQubitOp::setCNot()
 {
-	m_operator[0][0] = 1.0;
-	m_operator[1][1] = 1.0;
-	m_operator[2][3] = 1.0;
-	m_operator[3][2] = 1.0;
+	m_operator[0][0] = BASETYPE(1);
+	m_operator[1][1] = BASETYPE(1);
+	m_operator[2][3] = BASETYPE(1);
+	m_operator[3][2] = BASETYPE(1);
 }
 
-void TwoQubitOp::setCtrlZ( void )
+void TwoQubitOp::setCtrlZ()
 {
-	m_operator[0][0] =  1.0;
-	m_operator[1][1] =  1.0;
-	m_operator[2][2] =  1.0;
-	m_operator[3][3] = -1.0;
+	m_operator[0][0] =  BASETYPE(1);
+	m_operator[1][1] =  BASETYPE(1);
+	m_operator[2][2] =  BASETYPE(1);
+	m_operator[3][3] = -BASETYPE(1);
 }
 
-void TwoQubitOp::setSQCNot( void )
+void TwoQubitOp::setSQCNot()
 {
-	m_operator[0][0] = 1.0;
-	m_operator[1][1] = 1.0;
-	m_operator[2][2] = QMComplex( 0.5,  0.5 );
-	m_operator[3][3] = QMComplex( 0.5,  0.5 );
-	m_operator[2][3] = QMComplex( 0.5, -0.5 );
-	m_operator[3][2] = QMComplex( 0.5, -0.5 );
+	m_operator[0][0] = BASETYPE(1);
+	m_operator[1][1] = BASETYPE(1);
+	m_operator[2][2] = QMComplex( BASETYPE(0.5),  BASETYPE(0.5) );
+	m_operator[3][3] = QMComplex( BASETYPE(0.5),  BASETYPE(0.5) );
+	m_operator[2][3] = QMComplex( BASETYPE(0.5), -BASETYPE(0.5) );
+	m_operator[3][2] = QMComplex( BASETYPE(0.5), -BASETYPE(0.5) );
 }
 
-void TwoQubitOp::setSQCNotC( void )
+void TwoQubitOp::setSQCNotC()
 {
-	m_operator[0][0] = 1.0;
-	m_operator[1][1] = 1.0;
-	m_operator[2][2] = QMComplex( 0.5, -0.5 );
-	m_operator[3][3] = QMComplex( 0.5, -0.5 );
-	m_operator[2][3] = QMComplex( 0.5,  0.5 );
-	m_operator[3][2] = QMComplex( 0.5,  0.5 );
+	m_operator[0][0] = BASETYPE(1);
+	m_operator[1][1] = BASETYPE(1);
+	m_operator[2][2] = QMComplex( BASETYPE(0.5), -BASETYPE(0.5) );
+	m_operator[3][3] = QMComplex( BASETYPE(0.5), -BASETYPE(0.5) );
+	m_operator[2][3] = QMComplex( BASETYPE(0.5),  BASETYPE(0.5) );
+	m_operator[3][2] = QMComplex( BASETYPE(0.5),  BASETYPE(0.5) );
 }
 
 //--------------------------------------------------------------------

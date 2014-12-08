@@ -4,10 +4,11 @@
 #include "OneQubitOp.h"
 #include "TwoQubitOp.h"
 #include "DQMStateReg.h"
+#include "mpi.h"
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 class DQMachine
@@ -28,7 +29,16 @@ public:
 	void twoQubitEvolution( TwoQubitOp& op, int targetA, int targetB );	
 
 private:
+    void createBufWindow();
+    void deleteBufWindow();
+
+private:
     static DQMachine* m_curCopy;
+
+    DQMStateReg* m_work;
+    DQMStateReg* m_buf;
+
+    MPI_Win m_bufWin;
 };
 
 //--------------------------------------------------------------------

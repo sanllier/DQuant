@@ -1,14 +1,16 @@
 #include "DQMOperator.h"
 #include "Exception.h"
 #include "DQuant.h"
-#include "dislib.h"
+#include "mpicheck.h"
+#include "mpi.h"
+#include "defs.h"
 
 #include <cstring>
 #include <cmath>
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 DQMOperator::DQMOperator( OperatorSize size )
@@ -23,7 +25,7 @@ DQMOperator::DQMOperator( OperatorSize size )
 	for ( int i = 0; i < m_size; ++i ) 
     {
 		m_operator[i] = new QMComplex[ m_size ];
-        memset( m_operator[i], 0, sizeof( *m_operator ) * m_size );
+        memset( m_operator[i], 0, sizeof( **m_operator ) * m_size );
 	}
 }
 
@@ -41,18 +43,17 @@ DQMOperator::~DQMOperator()
 void DQMOperator::clear( void )
 {
 	for ( int i = 0; i < m_size; ++i )
-		for ( int q = 0; q < m_size; ++q )
-			m_operator[i][q] = 0.0;
+        memset( m_operator[i], 0, sizeof( **m_operator ) * m_size );
 }
 
 void DQMOperator::addNoise( double noiseFactor )
 {
-	double theta = 0.0;
+	BASETYPE theta = 0.0;
 
 	if ( DQuant::amIMaster() )
 		theta = DQuant::drand() * noiseFactor;
 
-	shmem_double_toall( &theta, MASTERID );
+    CHECK( MPI_Bcast( &theta, 1, MPI_BASETYPE, MASTERID, MPI_COMM_WORLD ) );
 
 	DQMOperator noise( ONEQUBIT );
 	noise[0][0] =  noise[1][1] = cos( theta );

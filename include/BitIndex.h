@@ -5,7 +5,7 @@
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 template<typename T>
@@ -40,7 +40,7 @@ public:
 	    if ( pos >= m_typeTSize )
 		    throw BitIndexOverflow( m_typeTSize - 1, pos );
 	    #endif
-	    return ( m_idx & ( T(1) << pos ) ) == 1;
+	    return ( ( m_idx & ( T(1) << pos ) ) != 0 );
     }
 	inline T flipBitAtPos( int pos )
     {

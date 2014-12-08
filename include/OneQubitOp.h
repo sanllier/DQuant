@@ -5,7 +5,7 @@
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 enum PresetOneQubitOpType
@@ -14,7 +14,8 @@ enum PresetOneQubitOpType
 	HADAMARD,
 	NOT,
 	YPAULI,
-	ZPAULI
+	ZPAULI,
+    IDENT
 };
 
 class OneQubitOp: public DQMOperator
@@ -24,10 +25,11 @@ public:
     ~OneQubitOp() {}
     using DQMOperator::operator=;
 
-	void setHadamard( void );
-	void setNot( void );	//XPauli
-	void setYPauli( void );
-	void setZPauli( void );
+	void setHadamard();
+	void setNot();	//XPauli
+	void setYPauli();
+	void setZPauli();
+    void setIdent();
 };
 
 //-------------------------------------------------------------------

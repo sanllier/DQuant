@@ -39,6 +39,15 @@
     <ClCompile Include="src\Algorithms.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\mpicheck.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DQContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DQDensityMatrix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\BitIndex.h">
@@ -68,10 +77,19 @@
     <ClInclude Include="include\TwoQubitOp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\dislib.h">
+    <ClInclude Include="include\Algorithms.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Algorithms.h">
+    <ClInclude Include="include\defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mpicheck.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DQContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DQDensityMatrix.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

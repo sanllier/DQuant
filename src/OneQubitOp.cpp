@@ -1,12 +1,13 @@
 #include "OneQubitOp.h"
 #include "Exception.h"
+#include "defs.h"
 
 #include <cmath>
 #include <iostream>
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 OneQubitOp::OneQubitOp( PresetOneQubitOpType type ):DQMOperator( ONEQUBIT )
@@ -24,6 +25,9 @@ OneQubitOp::OneQubitOp( PresetOneQubitOpType type ):DQMOperator( ONEQUBIT )
 		case ZPAULI:
 			setZPauli();
 			break;
+        case IDENT:
+            setIdent();
+            break;
 		case EMPTYONEQ:
 			break;
 		default:
@@ -32,9 +36,9 @@ OneQubitOp::OneQubitOp( PresetOneQubitOpType type ):DQMOperator( ONEQUBIT )
 	}
 }
 
-void OneQubitOp::setHadamard( void )
+void OneQubitOp::setHadamard()
 {
-	double temp = 1.0 / sqrt(2.0);
+	const BASETYPE temp = BASETYPE( 1.0 / sqrt(2.0) );
 
 	m_operator[0][0] =  temp; 
 	m_operator[0][1] =  temp;
@@ -43,22 +47,28 @@ void OneQubitOp::setHadamard( void )
 }
 
 //XPauli
-void OneQubitOp::setNot( void )
+void OneQubitOp::setNot()
 {
-	m_operator[0][1] = 1.0;
-	m_operator[1][0] = 1.0;
+	m_operator[0][1] = BASETYPE(1);
+	m_operator[1][0] = BASETYPE(1);
 }
 
-void OneQubitOp::setYPauli( void )
+void OneQubitOp::setYPauli()
 {
-	m_operator[0][1] = QMComplex(0.0, -1.0);
-	m_operator[1][0] = QMComplex(0.0,  1.0);
+	m_operator[0][1] = QMComplex( BASETYPE(0), -BASETYPE(1) );
+	m_operator[1][0] = QMComplex( BASETYPE(0),  BASETYPE(1) );
 }
 
-void OneQubitOp::setZPauli( void )
+void OneQubitOp::setZPauli()
 {
-	m_operator[0][0] =  1.0;
-	m_operator[1][1] = -1.0;
+	m_operator[0][0] =  BASETYPE(1);
+	m_operator[1][1] = -BASETYPE(1);
+}
+
+void OneQubitOp::setIdent()
+{
+	m_operator[0][0] =  BASETYPE(1);
+	m_operator[1][1] =  BASETYPE(1);
 }
 
 //--------------------------------------------------------------------

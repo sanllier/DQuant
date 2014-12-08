@@ -1,9 +1,9 @@
 #include "Exception.h"
 
-//--------------------------------------------------------------------
+//------------------------------------------------------------
 
-namespace DQuant{
-//--------------------------------------------------------------------
+namespace DQ{
+//------------------------------------------------------------
 
 void Exception::print( std::ostream& oStr ) const
 {
@@ -18,10 +18,10 @@ std::ostream& operator<<( std::ostream& oStr, const Exception& exc )
 
 //------------------------------------------------------------
 
-DislibInactive::DislibInactive( const std::string& excLoc )
+MPIException::MPIException( const std::string& excText, const std::string& excLoc )
 {
-	m_what = "Trying to use inactive dislib.";
-	m_where = excLoc;
+    m_what = excText;
+    m_where = excLoc;
 }
 
 //------------------------------------------------------------
@@ -52,5 +52,5 @@ OperatorException::OperatorException( const std::string& excText, const std::str
 	m_where = excLoc;
 }
 
-//--------------------------------------------------------------------
+//------------------------------------------------------------
 }

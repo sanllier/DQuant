@@ -39,7 +39,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(ProjectDir)lib\</OutDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>
@@ -47,7 +49,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)Microsoft MPI\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -73,23 +75,29 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DQContext.cpp" />
+    <ClCompile Include="src\DQDensityMatrix.cpp" />
     <ClCompile Include="src\DQMachine.cpp" />
     <ClCompile Include="src\DQMOperator.cpp" />
     <ClCompile Include="src\DQMStateReg.cpp" />
     <ClCompile Include="src\DQuant.cpp" />
     <ClCompile Include="src\Exception.cpp" />
+    <ClCompile Include="src\mpicheck.cpp" />
     <ClCompile Include="src\OneQubitOp.cpp" />
     <ClCompile Include="src\Algorithms.cpp" />
     <ClCompile Include="src\TwoQubitOp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\BitIndex.h" />
-    <ClInclude Include="include\dislib.h" />
+    <ClInclude Include="include\defs.h" />
+    <ClInclude Include="include\DQContext.h" />
+    <ClInclude Include="include\DQDensityMatrix.h" />
     <ClInclude Include="include\DQMachine.h" />
     <ClInclude Include="include\DQMOperator.h" />
     <ClInclude Include="include\DQMStateReg.h" />
     <ClInclude Include="include\DQuant.h" />
     <ClInclude Include="include\Exception.h" />
+    <ClInclude Include="include\mpicheck.h" />
     <ClInclude Include="include\OneQubitOp.h" />
     <ClInclude Include="include\QMComplex.h" />
     <ClInclude Include="include\Algorithms.h" />

@@ -2,14 +2,11 @@
 #define H_QMCOMPLEX
 
 #include <complex>
-
-#ifndef BASETYPE
-    #define BASETYPE double
-#endif
+#include "defs.h"
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 class QMComplex: public std::complex< BASETYPE >

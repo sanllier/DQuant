@@ -1,41 +1,14 @@
 #include "DQuant.h"
 #include "DQMachine.h"
 #include "BitIndex.h"
+#include "defs.h"
+#include "mpicheck.h"
 
 #include <iostream>
-#include <algorithm>
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
-//--------------------------------------------------------------------
-
-struct SendData
-{
-	QMComplex data;
-	long long idx;
-	char opRow;
-	char opCol;
-};
-
-enum
-{
-	EXCHNGHDLR = 5
-};
-
-//workReg is static because of HANDLERS must have access to it
-static DQMStateReg* workReg = 0;
-static DQMStateReg* buf     = 0;
-static DQMOperator* workOp  = 0;
-
-//------------------------------HANDLERS------------------------------
-
-void exchngElemHdlr( int from, void* data, int size )
-{
-	SendData* recvData = ( SendData * )(data);
-	buf->m_qRegister[ recvData->idx ] += (*workOp)[ recvData->opRow ][ recvData->opCol ] * recvData->data;
-}
-
+namespace DQ {
 //--------------------------------------------------------------------
 
 #ifdef _MSC_VER
@@ -60,193 +33,225 @@ DQMachine* DQMachine::getMachine( DQMStateReg *curReg )
     else 
     {
 		QOUT( "-- DQMachine also was created. Instance pointer was returned\r\n" );
-		QOUT( "-- WARNING: for setting new current state register use DQMachine::setCurReg\r\n" );
+		m_curCopy->setCurReg( curReg );
 	}
 
 	return m_curCopy;
 }
 
-DQMachine::DQMachine( DQMStateReg* curReg )
+DQMachine::DQMachine( DQMStateReg* curReg/* = 0 */)
+    : m_work(0)
+    , m_buf(0)
+    , m_bufWin( MPI_WIN_NULL )
 {
-    shmem_register_handler( exchngElemHdlr, EXCHNGHDLR );
-	workReg = curReg;
+    m_work = curReg;
 
-	if ( workReg ) 
+	if ( m_work ) 
     {
-		buf = new DQMStateReg( workReg->m_qnum );
+		m_buf = new DQMStateReg( m_work->getQubitsNum() );
 		QOUT( "-- DQMachine: buf state was alloced\r\n" );
 	} 
-    else 
-    {
-		buf = 0;
-	}
 }
 
 DQMachine::~DQMachine()
 {
-	delete buf;
-	buf = 0;
-
-    delete m_curCopy;
-	m_curCopy = 0;
+	delete m_buf;
+	m_buf = 0;
 
 	QOUT( "-- DQMachine was destroyed\r\n" );
 }
 
 DQMStateReg* DQMachine::setCurReg( DQMStateReg* curReg )
 {
-	DQMStateReg* temp = workReg;
-	workReg = curReg;
+    if ( !curReg )
+        throw Exception( std::string( "Trying to set invalid (NULL) state." ), std::string( __FUNCTION__ )  );
 
-	if ( workReg && temp && temp->m_qnum != workReg->m_qnum ) 
+    DQMStateReg* prevState = m_work;
+    m_work = curReg;
+
+    if ( !m_buf || curReg->getQubitsNum() != m_buf->getQubitsNum() )
     {
-		if ( buf ) {
-			delete buf;
-			buf = 0;
-			QOUT( "-- DQMachine: old buf state was deleted\r\n" );
-		} 
-	}
+        delete m_buf;
+        QOUT( "-- DQMachine: old buf state was deleted\r\n" );
+        m_buf = new DQMStateReg( curReg->getQubitsNum() );
+        QOUT( "-- DQMachine: buf state was alloced\r\n" );
+    }
 
-	if ( !buf && workReg ) 
-    {
-		buf = new DQMStateReg( workReg->m_qnum );	
-		QOUT( "-- DQMachine: buf state was alloced\r\n" );
-	}
-
-	QOUT( "-- DQMachine: new state was setted\r\n" );
-
-	return temp;
+    QOUT( "-- DQMachine: new state was setted\r\n" );
+    return prevState;
 }
 
 DQMStateReg* DQMachine::getCurReg( void ) const
 {
-	return workReg;
+	return m_work;
 }
 
 //--------------------------------------------------------------------
 
-//NOTE: this function is fucking non-safe: total type-slicing
-inline void sendElement( QMComplex& elem, long long locIdx, long long opR, long long opC, long long target )
-{
-    SendData sendingElement = { elem, locIdx, (int)opR, (int)opC };
-	shmem_send( &sendingElement, EXCHNGHDLR, sizeof( sendingElement ), (int)target );
-}
-
 void DQMachine::oneQubitEvolution( OneQubitOp& op, int target )
 {
-	workOp = &op;
-	buf->fillWithZeros();
+    if ( !m_work->getContext().isActive() )
+        return;
 
-	const int qubitsNumPerProc = workReg->m_qnum - int( log2( workReg->m_nodesNum ) );
-	const bool isUnlocal = ( ( workReg->m_qnum - 1 ) - target ) >= qubitsNumPerProc;
-	const long long rangeStart = workReg->m_myPartSize * workReg->m_myID;
-	const int flipBit = ( workReg->m_qnum - 1 ) - target;
-	int arrayPos = 0;
+	m_buf->fillWithZeros();
+    createBufWindow();
+
+	const int qubitsNumPerProc = m_work->getQubitsNum() - int( log2( m_work->getContext().commSize() ) );
+	const bool isUnlocal = ( ( m_work->getQubitsNum() - 1 ) - target ) >= qubitsNumPerProc;
+	const long long rangeStart = m_work->getLocalRegLen() * m_work->getContext().rank();
+	const int flipBit = ( m_work->getQubitsNum() - 1 ) - target;
 	const int targetBits[1] = { flipBit };
 	BitIndex< unsigned long long > locIdx, oppositeIdx;
 
-	DQuant::synchronise();
+    QMComplex* bufReg  = m_buf->getRaw();
+    QMComplex* workReg = m_work->getRaw();
+    QMComplex remoteElement;
 
-	for ( long long int i = 0; i < workReg->m_myPartSize; ++i ) 
+    CHECK( MPI_Barrier( m_work->getContext().comm() ) );
+
+	for ( long long i = 0; i < m_work->getLocalRegLen(); ++i ) 
     {
 		locIdx = i + rangeStart;
+
 		oppositeIdx = locIdx;
 		oppositeIdx.flipBitAtPos( flipBit );
 
-		arrayPos = (int)locIdx.select( targetBits, 1 );
+		const int arrayPos = (int)locIdx.select( targetBits, 1 );
 
 		if ( isUnlocal )
         {
-			sendElement( workReg->m_qRegister[i], i, arrayPos, oppositeIdx.select( targetBits, 1 ), 
-				        oppositeIdx >> qubitsNumPerProc );
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i];
+            int targetProc = int( oppositeIdx >> qubitsNumPerProc );
+
+            MPI_Win_fence( 0, m_bufWin ); 
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            MPI_Win_fence( 0, m_bufWin ); 
+
+            bufReg[i] += op[arrayPos][arrayPos] * workReg[i] +
+                         op[arrayPos][ oppositeIdx.select( targetBits, 1 ) ] * remoteElement;
 		} 
         else
-        {
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i] +
-                                   op[arrayPos][ oppositeIdx.select( targetBits, 1 ) ] * 
-                                   workReg->m_qRegister[ oppositeIdx.getIdx() - rangeStart ];
+        {  
+   			bufReg[i] += op[arrayPos][arrayPos]                              * workReg[i] +
+                         op[arrayPos][ oppositeIdx.select( targetBits, 1 ) ] * workReg[ oppositeIdx.getIdx() - rangeStart ];
 		}
 	}
 
-	DQuant::synchronise();
-    std::swap( workReg->m_qRegister, buf->m_qRegister );
-    DQuant::synchronise();
+    CHECK( MPI_Barrier( m_work->getContext().comm() ) );
+    m_work->swapInternalData( m_buf );
+    deleteBufWindow();
+    CHECK( MPI_Barrier( m_work->getContext().comm() ) );
 }
 
 void DQMachine::twoQubitEvolution( TwoQubitOp& op, int targetA, int targetB )
 {
-	workOp = &op;
-	buf->fillWithZeros();
+    if ( !m_work->getContext().isActive() )
+        return;
 
-	const int qubitsNumPerProc = workReg->m_qnum - int( log2( workReg->m_nodesNum ) );
-	const bool isAUnlocal = ( ( workReg->m_qnum - 1 ) - targetA ) >= qubitsNumPerProc;
-	const bool isBUnlocal = ( ( workReg->m_qnum - 1 ) - targetB ) >= qubitsNumPerProc;
-	const long long rangeStart = workReg->m_myPartSize * workReg->m_myID;
-	const int flipBitA  = ( workReg->m_qnum - 1 ) - targetA;
-	const int flipBitB  = ( workReg->m_qnum - 1 ) - targetB;
-	int arrayPos = 0;
-	const int targetBits[2] = { flipBitA, flipBitB };
+	m_buf->fillWithZeros();
+    createBufWindow();
+
+	const int qubitsNumPerProc = m_work->getQubitsNum() - int( log2( m_work->getContext().commSize() ) );
+    const bool isAUnlocal = ( ( m_work->getQubitsNum() - 1 ) - targetA ) >= qubitsNumPerProc;
+	const bool isBUnlocal = ( ( m_work->getQubitsNum() - 1 ) - targetB ) >= qubitsNumPerProc;
+	const long long rangeStart = m_work->getLocalRegLen() * m_work->getContext().rank();
+    const int flipBitA  = ( m_work->getQubitsNum() - 1 ) - targetA;
+	const int flipBitB  = ( m_work->getQubitsNum() - 1 ) - targetB;
+    const int targetBits[2] = { flipBitA, flipBitB };
 	BitIndex< unsigned long long > locIdx, oppositeIdxA, oppositeIdxB, oppositeIdxAB;
 
-	DQuant::synchronise();
+    QMComplex* bufReg  = m_buf->getRaw();
+    QMComplex* workReg = m_work->getRaw();
+    QMComplex remoteElement;
 
-	for ( long long i = 0; i < workReg->m_myPartSize; ++i )
+	CHECK( MPI_Barrier( m_work->getContext().comm() ) );
+
+	for ( long long i = 0; i < m_work->getLocalRegLen(); ++i )
     {
 		locIdx = i + rangeStart;
+
 		oppositeIdxA = oppositeIdxB = locIdx;
 		oppositeIdxA.flipBitAtPos( flipBitA );
 		oppositeIdxB.flipBitAtPos( flipBitB );
 
 		oppositeIdxAB = oppositeIdxA;
-		oppositeIdxAB.flipBitAtPos (flipBitB );
+       	oppositeIdxAB.flipBitAtPos ( flipBitB );
 
-		arrayPos = (int)locIdx.select( targetBits, 2 );
+	    const int arrayPos = (int)locIdx.select( targetBits, 2 );
 
 		if ( isAUnlocal && isBUnlocal ) 
         {	
-			sendElement(workReg->m_qRegister[i], i, arrayPos, oppositeIdxA.select(targetBits, 2), 
-				        oppositeIdxA >> qubitsNumPerProc);
-			sendElement(workReg->m_qRegister[i], i, arrayPos, oppositeIdxB.select(targetBits, 2), 
-				        oppositeIdxB >> qubitsNumPerProc);
-			sendElement(workReg->m_qRegister[i], i, arrayPos, oppositeIdxAB.select(targetBits, 2), 
-				        oppositeIdxAB >> qubitsNumPerProc);
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i];
+            bufReg[i] += op[arrayPos][arrayPos] * workReg[i];
+
+            int targetProc = int( oppositeIdxA >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxA.select( targetBits, 2 ) ] * workReg[ oppositeIdxA.getIdx() - rangeStart ];
+
+            targetProc = int( oppositeIdxB >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxB.select( targetBits, 2 ) ] * workReg[ oppositeIdxB.getIdx() - rangeStart ]; 
+	 					
+            targetProc = int( oppositeIdxAB >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxAB.select( targetBits, 2 ) ] * workReg[ oppositeIdxAB.getIdx() - rangeStart ];
 		} 
         else if ( isAUnlocal ) 
         {
-			sendElement(workReg->m_qRegister[i], i, arrayPos, oppositeIdxA.select(targetBits, 2), 
-				        oppositeIdxA >> qubitsNumPerProc);
-			sendElement(workReg->m_qRegister[oppositeIdxB.getIdx() - rangeStart], i, 
-				        arrayPos, oppositeIdxAB.select(targetBits, 2), 
-				        oppositeIdxA >> qubitsNumPerProc);	
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i] +
-								  op[arrayPos][oppositeIdxB.select(targetBits, 2)] * 
-								  workReg->m_qRegister[oppositeIdxB.getIdx() - rangeStart];
+            bufReg[i] += op[arrayPos][arrayPos]                               * workReg[i] +
+					     op[arrayPos][ oppositeIdxB.select( targetBits, 2 ) ] * workReg[ oppositeIdxB.getIdx() - rangeStart ];
+
+            int targetProc = int( oppositeIdxA >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxA.select( targetBits, 2 ) ] * workReg[ oppositeIdxA.getIdx() - rangeStart ];
+
+            targetProc = int( oppositeIdxAB >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxAB.select( targetBits, 2 ) ] * workReg[ oppositeIdxAB.getIdx() - rangeStart ];			
 		} 
         else if ( isBUnlocal ) 
         {
-			sendElement(workReg->m_qRegister[i], i, arrayPos, oppositeIdxB.select(targetBits, 2), 
-				        oppositeIdxB >> qubitsNumPerProc);
-			sendElement(workReg->m_qRegister[oppositeIdxA.getIdx() - rangeStart], i, 
-				        arrayPos, oppositeIdxAB.select(targetBits, 2), 
-				        oppositeIdxAB >> qubitsNumPerProc);	
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i] +
-								  op[arrayPos][oppositeIdxA.select(targetBits, 2)] * 
-								  workReg->m_qRegister[oppositeIdxA.getIdx() - rangeStart];
+            bufReg[i] += op[arrayPos][arrayPos]                             * workReg[i] +
+    		             op[arrayPos][ oppositeIdxA.select(targetBits, 2) ] * workReg[ oppositeIdxA.getIdx() - rangeStart ];
+
+            int targetProc = int( oppositeIdxB >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxB.select( targetBits, 2 ) ] * workReg[ oppositeIdxB.getIdx() - rangeStart ];
+
+            targetProc = int( oppositeIdxAB >> qubitsNumPerProc );
+            CHECK( MPI_Get( &remoteElement, 1, MPI_COMPLEXTYPE, targetProc, MPI_Aint(i), 1, MPI_COMPLEXTYPE, m_bufWin ) );
+            bufReg[i] += op[arrayPos][ oppositeIdxAB.select( targetBits, 2 ) ] * workReg[ oppositeIdxAB.getIdx() - rangeStart ];
 		} 
         else 
         {
-			buf->m_qRegister[i] += op[arrayPos][arrayPos] * workReg->m_qRegister[i] + 
-						          op[arrayPos][ oppositeIdxA.select(targetBits, 2) ]  * workReg->m_qRegister[ oppositeIdxA.getIdx() - rangeStart ] + 
-							      op[arrayPos][ oppositeIdxB.select(targetBits, 2) ]  * workReg->m_qRegister[ oppositeIdxB.getIdx() - rangeStart ] + 
-							      op[arrayPos][ oppositeIdxAB.select(targetBits, 2) ] * workReg->m_qRegister[ oppositeIdxAB.getIdx() - rangeStart ];
+	        bufReg[i] += op[arrayPos][arrayPos]                                * workReg[i] + 
+						 op[arrayPos][ oppositeIdxA.select( targetBits, 2 ) ]  * workReg[ oppositeIdxA.getIdx() - rangeStart ] + 
+	      			     op[arrayPos][ oppositeIdxB.select( targetBits, 2 ) ]  * workReg[ oppositeIdxB.getIdx() - rangeStart ] + 
+	 					 op[arrayPos][ oppositeIdxAB.select( targetBits, 2 ) ] * workReg[ oppositeIdxAB.getIdx() - rangeStart ];
 		}  
 	}
 
-	DQuant::synchronise();
-    std::swap( workReg->m_qRegister, buf->m_qRegister ); 
-    DQuant::synchronise();
+    CHECK( MPI_Barrier( m_work->getContext().comm() ) );
+    m_work->swapInternalData( m_buf );
+    deleteBufWindow();
+    CHECK( MPI_Barrier( m_work->getContext().comm() ) );
+}
+
+//--------------------------------------------------------------------
+
+void DQMachine::createBufWindow()
+{
+    if ( m_bufWin != MPI_WIN_NULL )
+        throw Exception( std::string( "Trying to create window, but previous was not closed." ), std::string( __FUNCTION__ ) );
+
+    MPI_Aint size = unsigned( m_work->getLocalRegLen() * sizeof( QMComplex ) );
+    MPI_Comm comm = m_work->getContext().comm();
+
+    CHECK( MPI_Win_create( m_work->getRaw(), size, sizeof( QMComplex ), MPI_INFO_NULL, comm, &m_bufWin ) );
+}
+
+void DQMachine::deleteBufWindow()
+{
+    if ( m_bufWin != MPI_WIN_NULL )
+        CHECK( MPI_Win_free( &m_bufWin ) );
 }
 
 //--------------------------------------------------------------------

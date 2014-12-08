@@ -5,7 +5,7 @@
 
 //--------------------------------------------------------------------
 
-namespace DQuant {
+namespace DQ {
 //--------------------------------------------------------------------
 
 enum PresetTwoQubitOpType
@@ -24,10 +24,10 @@ public:
     ~TwoQubitOp() {}
     using DQMOperator::operator=;
 
-	void setCNot( void );	
-	void setCtrlZ( void );
-	void setSQCNot( void );
-	void setSQCNotC( void );
+	void setCNot();	
+	void setCtrlZ();
+	void setSQCNot();
+	void setSQCNotC();
 };
 
 //--------------------------------------------------------------------
