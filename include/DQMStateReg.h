@@ -36,6 +36,9 @@ public:
 	void fillWithZeros();
 	void fillSpecial(); 	//{1.0, 0.0, ..., 0.0} - vector useful for debug
 
+    //NOTE: it is collective operation
+    void normalize();
+
 	//private data getters
     inline const DQContext& getContext() const { return m_ctx; }
     inline long long getLocalRegLen() const { return m_myPartSize; }

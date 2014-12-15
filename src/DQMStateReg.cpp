@@ -25,23 +25,23 @@ namespace DQ {
 
 DQMStateReg::DQMStateReg( int qnum, MPI_Comm baseComm/* = MPI_COMM_WORLD */)
     : m_ctx( qnum, baseComm )
-	, m_fullRegSize( 1LL << qnum )
-	, m_myPartSize(0)
-	, m_qnum( qnum )
-	, m_qRegister(0)
+    , m_fullRegSize( 1LL << qnum )
+    , m_myPartSize(0)
+    , m_qnum( qnum )
+    , m_qRegister(0)
 {
     if ( m_ctx.isActive() )
     {
-	    m_myPartSize = m_fullRegSize / m_ctx.commSize();
-	    m_qRegister = new QMComplex[ unsigned( m_myPartSize ) ];
-	    QOUT( "-- DQMStateReg was successfully created\r\n" );
+        m_myPartSize = m_fullRegSize / m_ctx.commSize();
+        m_qRegister = new QMComplex[ unsigned( m_myPartSize ) ];
+        QOUT( "-- DQMStateReg was successfully created\r\n" );
     }
 }
 
 DQMStateReg::~DQMStateReg()
 {
-	delete[] m_qRegister;
-	m_qRegister = 0;
+    delete[] m_qRegister;
+    m_qRegister = 0;
 }
 
 //--------------------------------------------------------------------
@@ -50,16 +50,16 @@ BASETYPE DQMStateReg::getNorm() const
 {
     ACTIVE_ONLY_R( BASETYPE(0) );
 
-	BASETYPE localSum = BASETYPE(0);
-	for ( long long i = 0; i < m_myPartSize; ++i ) 
+    BASETYPE localSum = BASETYPE(0);
+    for ( long long i = 0; i < m_myPartSize; ++i ) 
     {
-		const BASETYPE temp = BASETYPE( abs( m_qRegister[i] ) );
-		localSum += temp * temp;
-	}	
+        const BASETYPE temp = BASETYPE( abs( m_qRegister[i] ) );
+        localSum += temp * temp;
+    }
 
     BASETYPE totalSum = BASETYPE(0);
     CHECK( MPI_Allreduce( &localSum, &totalSum, 1, MPI_BASETYPE, MPI_SUM, m_ctx.comm() ) );
-	return BASETYPE( sqrt( totalSum ) );
+    return BASETYPE( sqrt( totalSum ) );
 }
 
 BASETYPE DQMStateReg::copmFidelity( const DQMStateReg& scndPart ) const
@@ -67,23 +67,23 @@ BASETYPE DQMStateReg::copmFidelity( const DQMStateReg& scndPart ) const
     ACTIVE_ONLY_R( BASETYPE(0) );
 
 #ifndef PERFORMANCE
-	if ( m_fullRegSize != scndPart.m_fullRegSize) 
-	    throw Exception( "Incomparable states.", __FUNCTION__ );
+    if ( m_fullRegSize != scndPart.m_fullRegSize) 
+        throw Exception( "Incomparable states.", __FUNCTION__ );
 #endif
 
-	QMComplex sum = 0;
-	for ( long long i = 0; i < m_myPartSize; ++i )
-		sum += m_qRegister[i] * scndPart.m_qRegister[i].conj();
+    QMComplex sum = 0;
+    for ( long long i = 0; i < m_myPartSize; ++i )
+        sum += m_qRegister[i] * scndPart.m_qRegister[i].conj();
 
-	BASETYPE localRe = sum.real();
-	BASETYPE localIm = sum.imag();
+    BASETYPE localRe = sum.real();
+    BASETYPE localIm = sum.imag();
     BASETYPE totalRe = 0.0;
     BASETYPE totalIm = 0.0;
     CHECK( MPI_Allreduce( &localRe, &totalRe, 1, MPI_BASETYPE, MPI_SUM, m_ctx.comm() ) );
     CHECK( MPI_Allreduce( &localIm, &totalIm, 1, MPI_BASETYPE, MPI_SUM, m_ctx.comm() ) );
 
-	const BASETYPE temp = BASETYPE( abs( QMComplex( totalRe, totalIm ) ) );
-	return temp * temp;
+    const BASETYPE temp = BASETYPE( abs( QMComplex( totalRe, totalIm ) ) );
+    return temp * temp;
 }
 
 //--------------------------------------------------------------------
@@ -155,12 +155,12 @@ double DQMStateReg::fillRandom()
 #endif
 
     const static BASETYPE DRAND_MAX = BASETYPE(3);
-	for ( long long i = 0; i < m_myPartSize; ++i )
-		m_qRegister[i] = QMComplex( DQuant::drand() / DRAND_MAX, DQuant::drand() / DRAND_MAX );
+    for ( long long i = 0; i < m_myPartSize; ++i )
+        m_qRegister[i] = QMComplex( DQuant::drand() / DRAND_MAX, DQuant::drand() / DRAND_MAX );
 
-	const BASETYPE norm = getNorm();    
-	for ( long long i = 0; i < m_myPartSize; ++i )
-		m_qRegister[i] /= norm;
+    const BASETYPE norm = getNorm();    
+    for ( long long i = 0; i < m_myPartSize; ++i )
+        m_qRegister[i] /= norm;
 
 #ifdef TIMER
     double randTime = MPI_Wtime() - startTime;
@@ -175,16 +175,25 @@ void DQMStateReg::fillWithZeros()
 {
     ACTIVE_ONLY;
 
-	memset( m_qRegister, 0, sizeof( *m_qRegister ) * unsigned( m_myPartSize ) );
+    memset( m_qRegister, 0, sizeof( *m_qRegister ) * unsigned( m_myPartSize ) );
 }
 
 void DQMStateReg::fillSpecial()
 {
     ACTIVE_ONLY;
 
-	fillWithZeros();
-	if ( m_ctx.rank() == 0 )
-		m_qRegister[0] = 1.0;
+    fillWithZeros();
+    if ( m_ctx.rank() == 0 )
+        m_qRegister[0] = 1.0;
+}
+
+//--------------------------------------------------------------------
+
+void DQMStateReg::normalize()
+{
+    BASETYPE curNorm = getNorm();
+    for ( long long i = 0; i < m_myPartSize; ++i )
+        m_qRegister[i] /= curNorm;
 }
 
 //--------------------------------------------------------------------
@@ -206,10 +215,10 @@ QMComplex& DQMStateReg::operator[]( long long idx )
     static QMComplex dummyElement( 0, 0 );
     ACTIVE_ONLY_R( dummyElement );
 
-	if ( idx / m_myPartSize == m_ctx.rank() )
-		return m_qRegister[ idx % m_myPartSize ];
+    if ( idx / m_myPartSize == m_ctx.rank() )
+        return m_qRegister[ idx % m_myPartSize ];
 
-	return dummyElement;
+    return dummyElement;
 }
 
 std::ostream& operator<<( std::ostream& oStr, const DQMStateReg& qState )
@@ -217,35 +226,35 @@ std::ostream& operator<<( std::ostream& oStr, const DQMStateReg& qState )
     if ( !qState.m_ctx.isActive() )
         return oStr;
 
-	for ( int i = 0; i < qState.m_ctx.commSize(); ++i ) 
+    for ( int i = 0; i < qState.m_ctx.commSize(); ++i ) 
     {
-		if ( qState.m_ctx.rank() == i ) 
+        if ( qState.m_ctx.rank() == i ) 
         {
             oStr << "Rank " << qState.m_ctx.rank() << ": ";
 
-			for ( long long q = 0; q < qState.m_myPartSize; ++q ) 
-				oStr << qState.m_qRegister[q] << " ";
+            for ( long long q = 0; q < qState.m_myPartSize; ++q ) 
+                oStr << qState.m_qRegister[q] << " ";
 
-			oStr.flush();
-		}
+            oStr.flush();
+        }
         CHECK( MPI_Barrier( qState.m_ctx.comm() ) );
-	}
+    }
 
-	if ( qState.m_ctx.rank() == MASTERID )
+    if ( qState.m_ctx.rank() == MASTERID )
     {
-		oStr << "\r\n";
-		oStr.flush();
-	}
-	CHECK( MPI_Barrier( qState.m_ctx.comm() ) );
-	return oStr;
+        oStr << "\r\n";
+        oStr.flush();
+    }
+    CHECK( MPI_Barrier( qState.m_ctx.comm() ) );
+    return oStr;
 }
 
 DQMStateReg& DQMStateReg::operator=( const DQMStateReg& src )
 {
     ACTIVE_ONLY_R(*this);
 
-	memcpy( m_qRegister, src.m_qRegister, sizeof( *m_qRegister ) * unsigned( m_myPartSize ) );
-	return *this;
+    memcpy( m_qRegister, src.m_qRegister, sizeof( *m_qRegister ) * unsigned( m_myPartSize ) );
+    return *this;
 }
 
 //--------------------------------------------------------------------
