@@ -4,6 +4,7 @@
 #include "QMComplex.h"
 #include "Exception.h"
 #include "DQMachine.h"
+#include "DQDensityMatrix.h"
 #include "defs.h"
 
 #include <cstdlib>

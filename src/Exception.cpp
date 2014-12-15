@@ -37,6 +37,17 @@ QRegisterOutOfBounds::QRegisterOutOfBounds( const std::string& excLoc, size_t mi
 
 //------------------------------------------------------------
 
+QDensityMatOutOfBounds::QDensityMatOutOfBounds( const std::string& excLoc, size_t min, size_t max, size_t cur )
+{
+	m_what = "Trying to access " + std::to_string(( unsigned long long )(cur)) +  \
+		     " element, but [" + std::to_string(( unsigned long long )(min)) + \
+             ", " + std::to_string(( unsigned long long )(max)) + \
+		     "] is available.";
+	m_where = excLoc;
+}
+
+//------------------------------------------------------------
+
 BitIndexOverflow::BitIndexOverflow(size_t max, size_t cur)
 {
 	m_what = "(BitIndex class) Bit position overflow. Accessing to " + \

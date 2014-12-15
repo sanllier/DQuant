@@ -43,6 +43,12 @@ public:
 	QRegisterOutOfBounds( const std::string& excLoc, size_t min, size_t max, size_t cur );
 };
 
+class QDensityMatOutOfBounds: public Exception
+{
+public:
+	QDensityMatOutOfBounds( const std::string& excLoc, size_t min, size_t max, size_t cur );
+};
+
 class BitIndexOverflow: public Exception
 {
 public:
